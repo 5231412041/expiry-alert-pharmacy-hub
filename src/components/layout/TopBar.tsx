@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Menu, Bell, Settings, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/use-toast';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,9 +27,37 @@ interface TopBarProps {
 }
 
 const TopBar = ({ toggleSidebar }: TopBarProps) => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const { toast } = useToast();
+  
+  const handleSettingsClick = (action: string) => {
+    setSettingsOpen(false);
+    
+    switch (action) {
+      case 'profile':
+        toast({
+          title: "Profile Settings",
+          description: "Profile settings functionality is coming soon",
+        });
+        break;
+      case 'notifications':
+        navigate('/app/notifications');
+        break;
+      case 'theme':
+        toast({
+          title: "Theme Settings",
+          description: "Theme customization is coming soon",
+        });
+        break;
+      case 'recipients':
+        navigate('/app/notifications');
+        break;
+      default:
+        break;
+    }
+  };
   
   return (
     <header className="bg-white border-b border-gray-200 py-3 px-4 flex items-center justify-between">
@@ -49,7 +78,7 @@ const TopBar = ({ toggleSidebar }: TopBarProps) => {
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Notifications</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => navigate('/notifications')}>
+            <DropdownMenuItem onClick={() => navigate('/app/notifications')}>
               Manage Notifications
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -95,10 +124,7 @@ const TopBar = ({ toggleSidebar }: TopBarProps) => {
               <Button 
                 variant="outline" 
                 className="w-full justify-start"
-                onClick={() => {
-                  setSettingsOpen(false);
-                  // Navigate to profile page if you create one
-                }}
+                onClick={() => handleSettingsClick('profile')}
               >
                 Profile Settings
               </Button>
@@ -109,10 +135,7 @@ const TopBar = ({ toggleSidebar }: TopBarProps) => {
               <Button 
                 variant="outline" 
                 className="w-full justify-start"
-                onClick={() => {
-                  setSettingsOpen(false);
-                  navigate('/notifications');
-                }}
+                onClick={() => handleSettingsClick('notifications')}
               >
                 Notification Settings
               </Button>
@@ -123,6 +146,7 @@ const TopBar = ({ toggleSidebar }: TopBarProps) => {
               <Button 
                 variant="outline" 
                 className="w-full justify-start"
+                onClick={() => handleSettingsClick('theme')}
               >
                 Theme Settings
               </Button>
@@ -134,10 +158,7 @@ const TopBar = ({ toggleSidebar }: TopBarProps) => {
                 <Button 
                   variant="outline" 
                   className="w-full justify-start"
-                  onClick={() => {
-                    setSettingsOpen(false);
-                    navigate('/notifications');
-                  }}
+                  onClick={() => handleSettingsClick('recipients')}
                 >
                   Manage Recipients
                 </Button>

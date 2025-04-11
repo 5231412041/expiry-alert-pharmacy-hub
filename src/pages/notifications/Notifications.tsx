@@ -12,6 +12,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { getDB } from "../../services/db";
 import { Notification, Recipient } from "../../types/models";
 import { useAuth } from "../../contexts/AuthContext";
+import { processPendingNotifications } from "../../services/notificationService";
 
 const NotificationsPage = () => {
   const { toast } = useToast();
@@ -69,6 +70,9 @@ const NotificationsPage = () => {
 
   const handleSaveSettings = async () => {
     try {
+      const schedule = { interval: 'daily', time: refreshTime, daysBeforeExpiry };
+      localStorage.setItem('notificationSchedule', JSON.stringify(schedule));
+      
       toast({
         title: "Settings saved",
         description: "Your notification preferences have been updated",
@@ -78,6 +82,36 @@ const NotificationsPage = () => {
       toast({
         title: "Error",
         description: "Could not save notification settings",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleRunCheckNow = async () => {
+    try {
+      toast({
+        title: "Processing notifications",
+        description: "Checking for expiring medicines...",
+      });
+      
+      const userEmail = user?.email || 'admin@example.com';
+      const userPhone = '1234567890';
+      
+      await processPendingNotifications(userEmail, userPhone);
+      
+      const db = await getDB();
+      const storedNotifications = await db.getAll('notifications');
+      setNotifications(storedNotifications);
+      
+      toast({
+        title: "Check complete",
+        description: "Notification check has been completed successfully",
+      });
+    } catch (error) {
+      console.error("Error running notification check:", error);
+      toast({
+        title: "Error",
+        description: "Could not run notification check",
         variant: "destructive"
       });
     }
@@ -331,6 +365,15 @@ const NotificationsPage = () => {
     );
   };
 
+  const runCheckNowButton = (
+    <div className="pt-2">
+      <Button className="w-full" variant="outline" onClick={handleRunCheckNow}>
+        <RefreshCw className="mr-2 h-4 w-4" />
+        Run check now
+      </Button>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -421,12 +464,7 @@ const NotificationsPage = () => {
                 </p>
               </div>
               
-              <div className="pt-2">
-                <Button className="w-full" variant="outline">
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Run check now
-                </Button>
-              </div>
+              {runCheckNowButton}
             </CardContent>
           </Card>
         </TabsContent>

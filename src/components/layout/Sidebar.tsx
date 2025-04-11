@@ -37,7 +37,10 @@ const SidebarItem = ({ icon, label, href, isActive }: SidebarItemProps) => (
     )}
   >
     {icon}
-    <span>{label}</span>
+    <span className={cn(
+      "transition-opacity duration-200",
+      !isActive && "group-hover:text-primary"
+    )}>{label}</span>
   </Link>
 );
 
@@ -48,13 +51,13 @@ const Sidebar = ({ isOpen }: SidebarProps) => {
   return (
     <aside 
       className={cn(
-        'bg-white border-r border-gray-200 z-30 transition-all duration-300 ease-in-out',
-        isOpen ? 'w-64' : 'w-0 md:w-20'
+        'bg-white border-r border-gray-200 z-30 transition-all duration-300 ease-in-out h-full',
+        isOpen ? 'w-64' : 'w-20'
       )}
     >
       <div className="h-full flex flex-col">
         <div className="p-4 border-b border-gray-200">
-          <div className={cn('flex items-center', !isOpen && 'md:justify-center')}>
+          <div className={cn('flex items-center', !isOpen && 'justify-center')}>
             <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-white text-lg font-bold">
               P
             </div>
@@ -71,58 +74,58 @@ const Sidebar = ({ isOpen }: SidebarProps) => {
           <div className="space-y-1">
             <SidebarItem 
               icon={<Home size={20} />} 
-              label="Home" 
-              href="/" 
-              isActive={location.pathname === '/' || location.pathname === '/home'} 
+              label={isOpen ? "Home" : ""}
+              href="/app/home" 
+              isActive={location.pathname === '/app/home'} 
             />
             
             <SidebarItem 
               icon={<LayoutDashboard size={20} />} 
-              label="Dashboard" 
-              href="/dashboard" 
-              isActive={location.pathname === '/dashboard'} 
+              label={isOpen ? "Dashboard" : ""}
+              href="/app/dashboard" 
+              isActive={location.pathname === '/app/dashboard'} 
             />
             
             <SidebarItem 
               icon={<Pill size={20} />} 
-              label="Medicines" 
-              href="/medicines" 
-              isActive={location.pathname === '/medicines'} 
+              label={isOpen ? "Medicines" : ""}
+              href="/app/medicines" 
+              isActive={location.pathname === '/app/medicines'} 
             />
             
             <SidebarItem 
               icon={<AlertTriangle size={20} />} 
-              label="Expiring Soon" 
-              href="/expiring-soon" 
-              isActive={location.pathname === '/expiring-soon'} 
+              label={isOpen ? "Expiring Soon" : ""}
+              href="/app/expiring-soon" 
+              isActive={location.pathname === '/app/expiring-soon'} 
             />
             
             <SidebarItem 
               icon={<CheckCircle size={20} />} 
-              label="Safe Medicines" 
-              href="/safe-medicines" 
-              isActive={location.pathname === '/safe-medicines'} 
+              label={isOpen ? "Safe Medicines" : ""}
+              href="/app/safe-medicines" 
+              isActive={location.pathname === '/app/safe-medicines'} 
             />
             
             <SidebarItem 
               icon={<Package size={20} />} 
-              label="Inventory" 
-              href="/inventory" 
-              isActive={location.pathname === '/inventory'} 
+              label={isOpen ? "Inventory" : ""}
+              href="/app/inventory" 
+              isActive={location.pathname === '/app/inventory'} 
             />
             
             <SidebarItem 
               icon={<FileSpreadsheet size={20} />} 
-              label="CSV Upload" 
-              href="/csv-upload" 
-              isActive={location.pathname === '/csv-upload'} 
+              label={isOpen ? "CSV Upload" : ""}
+              href="/app/csv-upload" 
+              isActive={location.pathname === '/app/csv-upload'} 
             />
             
             <SidebarItem 
               icon={<BellRing size={20} />} 
-              label="Notifications" 
-              href="/notifications" 
-              isActive={location.pathname === '/notifications'} 
+              label={isOpen ? "Notifications" : ""}
+              href="/app/notifications" 
+              isActive={location.pathname === '/app/notifications'} 
             />
           </div>
         </nav>
