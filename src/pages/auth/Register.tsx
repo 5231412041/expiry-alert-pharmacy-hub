@@ -7,8 +7,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2, CheckCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+
+// Password validation helper functions
+const hasMinLength = (password: string) => password.length >= 8;
+const hasUppercase = (password: string) => /[A-Z]/.test(password);
+const hasLowercase = (password: string) => /[a-z]/.test(password);
+const hasNumber = (password: string) => /[0-9]/.test(password);
+const hasSpecialChar = (password: string) => /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -20,6 +27,7 @@ const Register = () => {
   });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [passwordFocus, setPasswordFocus] = useState(false);
   
   const navigate = useNavigate();
   const { register } = useAuth();
@@ -33,18 +41,30 @@ const Register = () => {
     setFormData(prev => ({ ...prev, role: value as 'admin' | 'staff' }));
   };
   
+  const validatePassword = (password: string) => {
+    const validations = [
+      hasMinLength(password),
+      hasUppercase(password),
+      hasLowercase(password),
+      hasNumber(password),
+      hasSpecialChar(password)
+    ];
+    
+    return validations.every(validation => validation);
+  };
+  
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
     
-    // Validation
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+    // Enhanced validation
+    if (!validatePassword(formData.password)) {
+      setError('Password must meet all requirements');
       return;
     }
     
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
       return;
     }
     
@@ -70,6 +90,26 @@ const Register = () => {
       setIsLoading(false);
     }
   };
+  
+  // Password strength indicator
+  const PasswordRequirement = ({ 
+    text, 
+    met 
+  }: { 
+    text: string; 
+    met: boolean 
+  }) => (
+    <div className="flex items-center gap-2 text-sm">
+      {met ? (
+        <CheckCircle className="h-4 w-4 text-green-500" />
+      ) : (
+        <AlertCircle className="h-4 w-4 text-muted-foreground" />
+      )}
+      <span className={met ? "text-green-500" : "text-muted-foreground"}>
+        {text}
+      </span>
+    </div>
+  );
   
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4 py-8">
@@ -123,8 +163,35 @@ const Register = () => {
                 type="password"
                 value={formData.password}
                 onChange={handleChange}
+                onFocus={() => setPasswordFocus(true)}
+                onBlur={() => setPasswordFocus(false)}
                 required
               />
+              
+              {passwordFocus && (
+                <div className="bg-muted p-3 rounded-md mt-2 space-y-1">
+                  <PasswordRequirement 
+                    text="At least 8 characters" 
+                    met={hasMinLength(formData.password)} 
+                  />
+                  <PasswordRequirement 
+                    text="At least one uppercase letter" 
+                    met={hasUppercase(formData.password)} 
+                  />
+                  <PasswordRequirement 
+                    text="At least one lowercase letter" 
+                    met={hasLowercase(formData.password)} 
+                  />
+                  <PasswordRequirement 
+                    text="At least one number" 
+                    met={hasNumber(formData.password)} 
+                  />
+                  <PasswordRequirement 
+                    text="At least one special character" 
+                    met={hasSpecialChar(formData.password)} 
+                  />
+                </div>
+              )}
             </div>
             
             <div className="space-y-2">
@@ -137,6 +204,19 @@ const Register = () => {
                 onChange={handleChange}
                 required
               />
+              {formData.password && formData.confirmPassword && (
+                <div className="text-sm mt-1">
+                  {formData.password === formData.confirmPassword ? (
+                    <span className="text-green-500 flex items-center gap-1">
+                      <CheckCircle className="h-4 w-4" /> Passwords match
+                    </span>
+                  ) : (
+                    <span className="text-red-500 flex items-center gap-1">
+                      <AlertCircle className="h-4 w-4" /> Passwords do not match
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
             
             <div className="space-y-2">

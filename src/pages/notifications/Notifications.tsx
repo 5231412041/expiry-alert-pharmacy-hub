@@ -94,10 +94,7 @@ const NotificationsPage = () => {
         description: "Checking for expiring medicines...",
       });
       
-      const userEmail = user?.email || 'admin@example.com';
-      const userPhone = '1234567890';
-      
-      await processPendingNotifications(userEmail, userPhone);
+      await processPendingNotifications();
       
       const db = await getDB();
       const storedNotifications = await db.getAll('notifications');

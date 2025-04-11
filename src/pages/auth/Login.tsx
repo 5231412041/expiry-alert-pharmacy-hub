@@ -21,6 +21,13 @@ const Login = () => {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
+    
+    // Minimal validation (full validation would be done on the server)
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters');
+      return;
+    }
+    
     setIsLoading(true);
     
     try {
@@ -85,6 +92,10 @@ const Login = () => {
                 required
                 autoComplete="current-password"
               />
+              <p className="text-xs text-muted-foreground">
+                Password must be at least 8 characters and include uppercase, lowercase, 
+                numbers, and special characters.
+              </p>
             </div>
             
             <Button type="submit" className="w-full" disabled={isLoading}>
