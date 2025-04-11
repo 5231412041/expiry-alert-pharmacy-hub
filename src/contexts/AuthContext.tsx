@@ -1,8 +1,7 @@
 
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { v4 as uuidv4 } from 'uuid';
 import { User } from '../types/models';
-import { getDB } from '../services/db';
+import { authAPI } from '../services/api';
 import { toast } from '../components/ui/use-toast';
 
 interface AuthContextType {
@@ -34,7 +33,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const storedUser = localStorage.getItem('pharmacy-user');
     if (storedUser) {
       try {
-        setUser(JSON.parse(storedUser));
+        const userData = JSON.parse(storedUser);
+        setUser(userData);
+        // Also set the auth token
+        const token = localStorage.getItem('auth-token');
+        if (token) {
+          authAPI.setAuthToken(token);
+        }
       } catch (error) {
         console.error('Failed to parse stored user:', error);
         localStorage.removeItem('pharmacy-user');
@@ -46,33 +51,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Login function
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      const db = await getDB();
-      const userRecord = await db.get('users', email);
+      const response = await authAPI.login(email, password);
       
-      if (!userRecord) {
+      if (!response || !response.user) {
         toast({
           variant: "destructive",
           title: "Login Failed",
-          description: "User not found. Please check your email or register."
+          description: "Invalid credentials. Please try again."
         });
         return false;
       }
 
-      if (userRecord.password !== password) {
-        toast({
-          variant: "destructive",
-          title: "Login Failed",
-          description: "Incorrect password. Please try again."
-        });
-        return false;
+      setUser(response.user);
+      localStorage.setItem('pharmacy-user', JSON.stringify(response.user));
+      
+      // Store token if available
+      if (response.token) {
+        authAPI.setAuthToken(response.token);
       }
-
-      setUser(userRecord);
-      localStorage.setItem('pharmacy-user', JSON.stringify(userRecord));
       
       toast({
         title: "Login Successful",
-        description: `Welcome back, ${userRecord.name}!`
+        description: `Welcome back, ${response.user.name}!`
       });
       
       return true;
@@ -95,32 +95,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     role: 'admin' | 'staff'
   ): Promise<boolean> => {
     try {
-      const db = await getDB();
+      const response = await authAPI.register(name, email, password, role);
       
-      // Check if user already exists
-      const existingUser = await db.get('users', email);
-      if (existingUser) {
+      if (!response || !response.user) {
         toast({
           variant: "destructive",
           title: "Registration Failed",
-          description: "Email already registered. Please login instead."
+          description: response?.message || "Failed to create account."
         });
         return false;
       }
 
-      const newUser: User = {
-        id: uuidv4(),
-        name,
-        email,
-        password,
-        role,
-        createdAt: new Date()
-      };
-
-      await db.put('users', newUser);
+      setUser(response.user);
+      localStorage.setItem('pharmacy-user', JSON.stringify(response.user));
       
-      setUser(newUser);
-      localStorage.setItem('pharmacy-user', JSON.stringify(newUser));
+      // Store token if available
+      if (response.token) {
+        authAPI.setAuthToken(response.token);
+      }
       
       toast({
         title: "Registration Successful",
@@ -128,12 +120,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Registration error:', error);
+      
+      let errorMessage = "An error occurred during registration.";
+      if (error.response && error.response.data && error.response.data.message) {
+        errorMessage = error.response.data.message;
+      }
+      
       toast({
         variant: "destructive",
         title: "Registration Error",
-        description: "An error occurred during registration. Please try again."
+        description: errorMessage
       });
       return false;
     }
@@ -143,6 +141,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     setUser(null);
     localStorage.removeItem('pharmacy-user');
+    localStorage.removeItem('auth-token');
+    authAPI.setAuthToken(null);
     toast({
       title: "Logged Out",
       description: "You have been logged out successfully."

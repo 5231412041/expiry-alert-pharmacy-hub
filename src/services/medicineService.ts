@@ -1,6 +1,5 @@
 
-import { v4 as uuidv4 } from 'uuid';
-import { getDB } from './db';
+import { medicineAPI } from './api';
 import { Medicine, MedicineStatus, MedicineWithStatus, SummaryStats } from '../types/models';
 
 // Re-export MedicineStatus enum to maintain backward compatibility
@@ -23,88 +22,71 @@ export function calculateMedicineStatus(expiryDate: Date): MedicineStatus {
 
 // Add a new medicine
 export async function addMedicine(medicine: Omit<Medicine, 'id' | 'addedAt'>): Promise<Medicine> {
-  const db = await getDB();
-  
-  const newMedicine: Medicine = {
-    ...medicine,
-    id: uuidv4(),
-    addedAt: new Date()
-  };
-  
-  await db.put('medicines', newMedicine);
-  return newMedicine;
+  return await medicineAPI.addMedicine(medicine);
 }
 
 // Get all medicines with their status
 export async function getAllMedicines(): Promise<MedicineWithStatus[]> {
-  const db = await getDB();
-  const medicines = await db.getAll('medicines');
+  const medicines = await medicineAPI.getAllMedicines();
   
-  return medicines.map(medicine => ({
+  // Ensure date objects are properly parsed from API response
+  return medicines.map((medicine: Medicine) => ({
     ...medicine,
-    status: calculateMedicineStatus(medicine.expiryDate)
+    expiryDate: new Date(medicine.expiryDate),
+    manufactureDate: new Date(medicine.manufactureDate),
+    addedAt: new Date(medicine.addedAt),
+    status: calculateMedicineStatus(new Date(medicine.expiryDate))
   }));
 }
 
 // Get medicines by status
 export async function getMedicinesByStatus(status: MedicineStatus): Promise<MedicineWithStatus[]> {
-  const allMedicines = await getAllMedicines();
-  return allMedicines.filter(medicine => medicine.status === status);
+  const medicines = await medicineAPI.getMedicinesByStatus(status);
+  
+  // Ensure date objects are properly parsed from API response
+  return medicines.map((medicine: Medicine) => ({
+    ...medicine,
+    expiryDate: new Date(medicine.expiryDate),
+    manufactureDate: new Date(medicine.manufactureDate),
+    addedAt: new Date(medicine.addedAt),
+    status
+  }));
 }
 
 // Get medicine by id
 export async function getMedicineById(id: string): Promise<MedicineWithStatus | null> {
-  const db = await getDB();
-  const medicine = await db.get('medicines', id);
-  
-  if (!medicine) return null;
-  
-  return {
-    ...medicine,
-    status: calculateMedicineStatus(medicine.expiryDate)
-  };
+  try {
+    const medicine = await medicineAPI.getMedicineById(id);
+    
+    if (!medicine) return null;
+    
+    return {
+      ...medicine,
+      expiryDate: new Date(medicine.expiryDate),
+      manufactureDate: new Date(medicine.manufactureDate),
+      addedAt: new Date(medicine.addedAt),
+      status: calculateMedicineStatus(new Date(medicine.expiryDate))
+    };
+  } catch (error) {
+    console.error('Error fetching medicine:', error);
+    return null;
+  }
 }
 
 // Update medicine
 export async function updateMedicine(medicine: Medicine): Promise<Medicine> {
-  const db = await getDB();
-  await db.put('medicines', medicine);
-  return medicine;
+  return await medicineAPI.updateMedicine(medicine);
 }
 
 // Delete medicine
 export async function deleteMedicine(id: string): Promise<boolean> {
-  const db = await getDB();
-  await db.delete('medicines', id);
+  await medicineAPI.deleteMedicine(id);
   return true;
 }
 
 // Get summary statistics
 export async function getMedicineSummary(): Promise<SummaryStats> {
-  const allMedicines = await getAllMedicines();
-  
-  const result: SummaryStats = {
-    total: allMedicines.length,
-    safe: 0,
-    expiringSoon: 0,
-    expired: 0
-  };
-  
-  allMedicines.forEach(medicine => {
-    switch (medicine.status) {
-      case MedicineStatus.SAFE:
-        result.safe++;
-        break;
-      case MedicineStatus.EXPIRING_SOON:
-        result.expiringSoon++;
-        break;
-      case MedicineStatus.EXPIRED:
-        result.expired++;
-        break;
-    }
-  });
-  
-  return result;
+  return await medicineAPI.getMedicineSummary();
 }
 
 // Import medicines from CSV data
@@ -119,22 +101,20 @@ export async function importMedicinesFromCSV(
     addedBy: string;
   }>
 ): Promise<Medicine[]> {
-  const db = await getDB();
-  const tx = db.transaction('medicines', 'readwrite');
+  // Format dates for API transmission
+  const formattedData = csvData.map(item => ({
+    ...item,
+    manufactureDate: item.manufactureDate instanceof Date ? item.manufactureDate.toISOString() : item.manufactureDate,
+    expiryDate: item.expiryDate instanceof Date ? item.expiryDate.toISOString() : item.expiryDate
+  }));
   
-  const newMedicines: Medicine[] = [];
+  const importedMedicines = await medicineAPI.importMedicinesFromCSV(formattedData);
   
-  for (const item of csvData) {
-    const medicine: Medicine = {
-      ...item,
-      id: uuidv4(),
-      addedAt: new Date()
-    };
-    
-    await tx.store.add(medicine);
-    newMedicines.push(medicine);
-  }
-  
-  await tx.done;
-  return newMedicines;
+  // Parse dates from API response
+  return importedMedicines.map((medicine: Medicine) => ({
+    ...medicine,
+    expiryDate: new Date(medicine.expiryDate),
+    manufactureDate: new Date(medicine.manufactureDate),
+    addedAt: new Date(medicine.addedAt)
+  }));
 }

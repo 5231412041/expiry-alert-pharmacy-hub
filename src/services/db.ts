@@ -1,93 +1,31 @@
 
-import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import { User, Medicine, Notification } from '../types/models';
+/**
+ * IMPORTANT NOTICE:
+ * 
+ * This file is now a placeholder for documentation purposes only.
+ * The application has been migrated to use PostgreSQL instead of IndexedDB.
+ * 
+ * To set up the PostgreSQL database:
+ * 
+ * 1. Create a PostgreSQL database named 'pharmacy_db'
+ * 2. Update your credentials in the src/config.ts file
+ * 3. Run the SQL migration script included in the repository at 'scripts/database-setup.sql'
+ * 
+ * The backend API service will handle all database interactions.
+ * See src/config.ts for database connection settings.
+ */
 
-// Recipient interface
-interface Recipient {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  role: string;
-  receiveEmail: boolean;
-  receiveWhatsapp: boolean;
-}
+import { dbConfig } from '../config';
 
-interface PharmacyDB extends DBSchema {
-  users: {
-    key: string;
-    value: User;
-    indexes: { 'by-email': string };
-  };
-  medicines: {
-    key: string;
-    value: Medicine;
-    indexes: { 'by-expiry': Date };
-  };
-  notifications: {
-    key: string;
-    value: Notification;
-    indexes: { 'by-medicine': string };
-  };
-  recipients: {
-    key: string;
-    value: Recipient;
-    indexes: { 'by-role': string };
-  };
-  stockLogs: {
-    key: string;
-    value: {
-      id: string;
-      medicineId: string;
-      adjustmentAmount: number;
-      userId: string;
-      timestamp: Date;
-    };
-    indexes: { 'by-medicine': string };
-  };
-}
-
-let db: IDBPDatabase<PharmacyDB>;
-
+// This function is now just for compatibility with existing code
 export async function initDB(): Promise<void> {
-  db = await openDB<PharmacyDB>('pharmacy-db', 1, {
-    upgrade(db) {
-      // Users store
-      if (!db.objectStoreNames.contains('users')) {
-        const userStore = db.createObjectStore('users', { keyPath: 'id' });
-        userStore.createIndex('by-email', 'email', { unique: true });
-      }
-      
-      // Medicines store
-      if (!db.objectStoreNames.contains('medicines')) {
-        const medicineStore = db.createObjectStore('medicines', { keyPath: 'id' });
-        medicineStore.createIndex('by-expiry', 'expiryDate');
-      }
-      
-      // Notifications store
-      if (!db.objectStoreNames.contains('notifications')) {
-        const notificationStore = db.createObjectStore('notifications', { keyPath: 'id' });
-        notificationStore.createIndex('by-medicine', 'medicineId');
-      }
-      
-      // Recipients store
-      if (!db.objectStoreNames.contains('recipients')) {
-        const recipientStore = db.createObjectStore('recipients', { keyPath: 'id' });
-        recipientStore.createIndex('by-role', 'role');
-      }
-      
-      // Stock Logs store
-      if (!db.objectStoreNames.contains('stockLogs')) {
-        const stockLogStore = db.createObjectStore('stockLogs', { keyPath: 'id' });
-        stockLogStore.createIndex('by-medicine', 'medicineId');
-      }
-    }
-  });
+  console.log('PostgreSQL database will be used instead of IndexedDB');
+  console.log('Please ensure your PostgreSQL credentials are set in src/config.ts');
+  console.log(`Database configuration: ${dbConfig.host}:${dbConfig.port}/${dbConfig.database}`);
 }
 
-export async function getDB(): Promise<IDBPDatabase<PharmacyDB>> {
-  if (!db) {
-    await initDB();
-  }
-  return db;
+// This function is now just for compatibility with existing code
+export async function getDB(): Promise<any> {
+  console.warn('getDB() is deprecated. Use API services instead.');
+  return null;
 }

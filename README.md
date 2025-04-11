@@ -1,73 +1,64 @@
-# Welcome to your Lovable project
 
-## Project info
+# Pharmacy Management System
 
-**URL**: https://lovable.dev/projects/42ac83a1-c6e6-46f9-a829-9bf570aab836
+## PostgreSQL Database Setup
 
-## How can I edit this code?
+This application uses PostgreSQL for data storage. Follow these steps to set up your local database:
 
-There are several ways of editing your application.
+### 1. Install PostgreSQL
 
-**Use Lovable**
+If you haven't already installed PostgreSQL, download and install it from the [official website](https://www.postgresql.org/download/).
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/42ac83a1-c6e6-46f9-a829-9bf570aab836) and start prompting.
+### 2. Create the Database
 
-Changes made via Lovable will be committed automatically to this repo.
+Open the PostgreSQL command line tool (psql) and run:
 
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```sql
+CREATE DATABASE pharmacy_db;
 ```
 
-**Edit a file directly in GitHub**
+### 3. Run the Setup Script
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Navigate to the project directory and run the setup script:
 
-**Use GitHub Codespaces**
+```bash
+psql -U your_username -d pharmacy_db -f scripts/database-setup.sql
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Replace `your_username` with your PostgreSQL username.
 
-## What technologies are used for this project?
+### 4. Configure the Application
 
-This project is built with:
+Update your database credentials in `src/config.ts`:
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+```typescript
+export const dbConfig = {
+  host: 'localhost',
+  port: 5432,
+  database: 'pharmacy_db',
+  user: 'your_username',
+  password: 'your_password'
+};
+```
 
-## How can I deploy this project?
+### 5. Setup Backend API Server
 
-Simply open [Lovable](https://lovable.dev/projects/42ac83a1-c6e6-46f9-a829-9bf570aab836) and click on Share -> Publish.
+The frontend application expects a backend API server running on `http://localhost:5000`. You will need to implement this server using a technology like Node.js/Express, Python/Django, etc.
 
-## Can I connect a custom domain to my Lovable project?
+The server should implement the API endpoints defined in the `src/services/api.ts` file and connect to your PostgreSQL database.
 
-Yes it is!
+## Default Admin User
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+After running the setup script, a default admin user will be created:
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+- Email: admin@example.com
+- Password: admin123
+
+## Development
+
+To start the frontend application:
+
+```bash
+npm install
+npm run dev
+```
