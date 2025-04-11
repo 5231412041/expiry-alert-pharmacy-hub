@@ -1,58 +1,29 @@
 
 import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Switch } from "@/components/ui/switch";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { 
-  BellRing, AlertTriangle, CheckCircle, Mail, MessageSquare, 
-  Loader2, Settings, UserPlus, Users, Trash2, Edit, Check 
-} from 'lucide-react';
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { getMedicineSummary } from '../../services/medicineService';
-import { 
-  processPendingNotifications, 
-  getAllRecipients, 
-  addRecipient, 
-  removeRecipient, 
-  updateRecipient,
-  scheduleAutomatedNotifications
-} from '../../services/notificationService';
-import { useAuth } from '../../contexts/AuthContext';
-import { toast } from '@/components/ui/use-toast';
+import { Bell, Clock, Mail, AlertTriangle, User, Users, RefreshCw, Trash2 } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
+import { getDB } from "../../services/db";
+import { Notification, Recipient } from "../../types/models";
+import { useAuth } from "../../contexts/AuthContext";
 
-interface Recipient {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  role: string;
-  receiveEmail: boolean;
-  receiveWhatsapp: boolean;
-}
-
-const Notifications = () => {
+const NotificationsPage = () => {
+  const { toast } = useToast();
   const { user } = useAuth();
-  const [isLoading, setIsLoading] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [summaryLoaded, setSummaryLoaded] = useState(false);
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [whatsappNotifications, setWhatsappNotifications] = useState(true);
-  const [phoneNumber, setPhoneNumber] = useState('+1234567890');
-  const [medicineStats, setMedicineStats] = useState({
-    expiringSoon: 0,
-    expired: 0
-  });
+  const [emailEnabled, setEmailEnabled] = useState(true);
+  const [whatsappEnabled, setWhatsappEnabled] = useState(true);
+  const [daysBeforeExpiry, setDaysBeforeExpiry] = useState(30);
+  const [refreshTime, setRefreshTime] = useState("08:00");
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [recipients, setRecipients] = useState<Recipient[]>([]);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newRecipient, setNewRecipient] = useState({
     name: '',
     email: '',
@@ -62,112 +33,83 @@ const Notifications = () => {
     receiveWhatsapp: false
   });
   const [editingRecipient, setEditingRecipient] = useState<Recipient | null>(null);
-  const [isAddingRecipient, setIsAddingRecipient] = useState(false);
-  const [automationEnabled, setAutomationEnabled] = useState(false);
-  const [automationInterval, setAutomationInterval] = useState('daily');
-  const [automationTime, setAutomationTime] = useState('09:00');
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   
-  // Load medicine summary and recipients on component mount
+  // Fetch notifications and recipients on component mount
   useEffect(() => {
-    loadSummary();
-    if (user?.role === 'admin') {
-      loadRecipients();
-    }
-    // Check if automation is enabled from localStorage
-    const savedAutomation = localStorage.getItem('automationEnabled');
-    if (savedAutomation) {
-      setAutomationEnabled(savedAutomation === 'true');
-    }
-    const savedInterval = localStorage.getItem('automationInterval');
-    if (savedInterval) {
-      setAutomationInterval(savedInterval);
-    }
-    const savedTime = localStorage.getItem('automationTime');
-    if (savedTime) {
-      setAutomationTime(savedTime);
-    }
-  }, [user]);
-  
-  const loadSummary = async () => {
-    setIsLoading(true);
-    try {
-      const summary = await getMedicineSummary();
-      setMedicineStats({
-        expiringSoon: summary.expiringSoon,
-        expired: summary.expired
-      });
-      setSummaryLoaded(true);
-    } catch (error) {
-      console.error('Error loading medicine summary:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to load medicine summary"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  const loadRecipients = async () => {
-    if (user?.role !== 'admin') return;
+    const fetchData = async () => {
+      try {
+        const db = await getDB();
+        const storedNotifications = await db.getAll('notifications');
+        const storedRecipients = await db.getAll('recipients');
+        
+        setNotifications(storedNotifications);
+        setRecipients(storedRecipients);
+        
+        // Also fetch notification settings
+        const settingsStore = db.transaction('recipients', 'readonly')
+          .objectStore('recipients');
+        
+        // This is simplified, in a real app you might have a dedicated settings store
+        const settingsCursor = await settingsStore.openCursor();
+        if (settingsCursor) {
+          setEmailEnabled(true); // Default values
+          setWhatsappEnabled(true);
+          setDaysBeforeExpiry(30);
+          setRefreshTime("08:00");
+        }
+      } catch (error) {
+        console.error("Error fetching notification data:", error);
+        toast({
+          title: "Error",
+          description: "Could not load notification data",
+          variant: "destructive"
+        });
+      }
+    };
     
+    fetchData();
+  }, [toast]);
+
+  const handleSaveSettings = async () => {
     try {
-      const data = await getAllRecipients();
-      setRecipients(data);
-    } catch (error) {
-      console.error('Error loading recipients:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to load notification recipients"
-      });
-    }
-  };
-  
-  const handleSendNotifications = async () => {
-    if (!user) return;
-    
-    setIsProcessing(true);
-    
-    try {
-      // Process notifications
-      await processPendingNotifications(user.email, phoneNumber);
+      // In a real app, save these settings to the database
+      // For now, we'll just show a success toast
       
       toast({
-        title: "Success",
-        description: "Notifications have been sent successfully"
+        title: "Settings saved",
+        description: "Your notification preferences have been updated",
       });
     } catch (error) {
-      console.error('Error sending notifications:', error);
+      console.error("Error saving settings:", error);
       toast({
-        variant: "destructive",
         title: "Error",
-        description: "Failed to send notifications"
+        description: "Could not save notification settings",
+        variant: "destructive"
       });
-    } finally {
-      setIsProcessing(false);
     }
   };
-  
-  const handleSaveSettings = () => {
-    toast({
-      title: "Settings Saved",
-      description: "Your notification settings have been updated"
-    });
-  };
-  
+
   const handleAddRecipient = async () => {
-    if (!user || user.role !== 'admin') return;
-    
-    setIsAddingRecipient(true);
     try {
-      const recipient = await addRecipient({
-        ...newRecipient,
-        id: '',
-      });
+      const db = await getDB();
       
-      setRecipients([...recipients, recipient]);
+      // Generate a unique ID
+      const newId = `recipient-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      
+      // Create the new recipient object with the generated ID
+      const recipientToAdd = {
+        ...newRecipient,
+        id: newId,
+      };
+      
+      // Add to IndexedDB
+      await db.add('recipients', recipientToAdd);
+      
+      // Update local state
+      setRecipients([...recipients, recipientToAdd]);
+      
+      // Reset form and close dialog
       setNewRecipient({
         name: '',
         email: '',
@@ -176,583 +118,535 @@ const Notifications = () => {
         receiveEmail: true,
         receiveWhatsapp: false
       });
+      setIsAddDialogOpen(false);
       
       toast({
-        title: "Recipient Added",
-        description: `${recipient.name} has been added to the notification list`
+        title: "Recipient added",
+        description: "New notification recipient has been added"
       });
     } catch (error) {
-      console.error('Error adding recipient:', error);
+      console.error("Error adding recipient:", error);
       toast({
-        variant: "destructive",
         title: "Error",
-        description: "Failed to add recipient"
-      });
-    } finally {
-      setIsAddingRecipient(false);
-    }
-  };
-  
-  const handleRemoveRecipient = async (id: string) => {
-    if (!user || user.role !== 'admin') return;
-    
-    try {
-      await removeRecipient(id);
-      setRecipients(recipients.filter(r => r.id !== id));
-      
-      toast({
-        title: "Recipient Removed",
-        description: "The recipient has been removed from the notification list"
-      });
-    } catch (error) {
-      console.error('Error removing recipient:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to remove recipient"
+        description: "Could not add new recipient",
+        variant: "destructive"
       });
     }
   };
-  
-  const handleStartEditing = (recipient: Recipient) => {
+
+  const handleDeleteRecipient = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this recipient?")) {
+      try {
+        const db = await getDB();
+        await db.delete('recipients', id);
+        
+        // Update local state
+        setRecipients(recipients.filter(recipient => recipient.id !== id));
+        
+        toast({
+          title: "Recipient deleted",
+          description: "The notification recipient has been removed"
+        });
+      } catch (error) {
+        console.error("Error deleting recipient:", error);
+        toast({
+          title: "Error",
+          description: "Could not delete recipient",
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
+  const openEditDialog = (recipient: Recipient) => {
     setEditingRecipient(recipient);
+    setIsEditDialogOpen(true);
   };
-  
+
   const handleUpdateRecipient = async () => {
-    if (!editingRecipient || !user || user.role !== 'admin') return;
+    if (!editingRecipient) return;
     
     try {
-      await updateRecipient(editingRecipient);
-      setRecipients(recipients.map(r => r.id === editingRecipient.id ? editingRecipient : r));
+      const db = await getDB();
+      await db.put('recipients', editingRecipient);
+      
+      // Update local state
+      setRecipients(recipients.map(r => 
+        r.id === editingRecipient.id ? editingRecipient : r
+      ));
+      
+      // Close dialog and reset
+      setIsEditDialogOpen(false);
       setEditingRecipient(null);
       
       toast({
-        title: "Recipient Updated",
-        description: `${editingRecipient.name}'s information has been updated`
+        title: "Recipient updated",
+        description: "The notification recipient has been updated"
       });
     } catch (error) {
-      console.error('Error updating recipient:', error);
+      console.error("Error updating recipient:", error);
       toast({
-        variant: "destructive",
         title: "Error",
-        description: "Failed to update recipient"
+        description: "Could not update recipient",
+        variant: "destructive"
       });
     }
   };
-  
-  const handleAutomationToggle = async (enabled: boolean) => {
-    setAutomationEnabled(enabled);
-    localStorage.setItem('automationEnabled', enabled.toString());
-    
-    if (enabled) {
-      try {
-        await scheduleAutomatedNotifications(automationInterval, automationTime);
-        toast({
-          title: "Automation Enabled",
-          description: `Notifications will be sent ${automationInterval} at ${automationTime}`
-        });
-      } catch (error) {
-        console.error('Error enabling automation:', error);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to enable automated notifications"
-        });
-      }
-    } else {
-      toast({
-        title: "Automation Disabled",
-        description: "Automated notifications have been turned off"
-      });
+
+  const renderNotificationHistory = () => {
+    if (notifications.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center p-8">
+          <Bell className="h-12 w-12 text-gray-300 mb-4" />
+          <h3 className="text-lg font-medium text-gray-500">No notifications yet</h3>
+          <p className="text-gray-400 text-center mt-1">
+            Notifications will appear here once they are sent
+          </p>
+        </div>
+      );
     }
-  };
-  
-  const handleIntervalChange = (interval: string) => {
-    setAutomationInterval(interval);
-    localStorage.setItem('automationInterval', interval);
     
-    if (automationEnabled) {
-      scheduleAutomatedNotifications(interval, automationTime);
-    }
+    return (
+      <Table>
+        <TableCaption>List of recent notifications</TableCaption>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Date</TableHead>
+            <TableHead>Type</TableHead>
+            <TableHead>Message</TableHead>
+            <TableHead>Status</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {notifications.map((notification) => (
+            <TableRow key={notification.id}>
+              <TableCell>{new Date(notification.timestamp).toLocaleDateString()}</TableCell>
+              <TableCell>
+                {notification.type === 'email' ? (
+                  <Mail className="h-4 w-4 inline mr-1" />
+                ) : (
+                  <Bell className="h-4 w-4 inline mr-1" />
+                )}
+                {notification.type}
+              </TableCell>
+              <TableCell className="max-w-xs truncate">{notification.message}</TableCell>
+              <TableCell>
+                <span className={`px-2 py-1 rounded-full text-xs ${
+                  notification.status === 'sent' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
+                }`}>
+                  {notification.status}
+                </span>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    );
   };
-  
-  const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setAutomationTime(e.target.value);
-    localStorage.setItem('automationTime', e.target.value);
+
+  const renderRecipientsList = () => {
+    if (recipients.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center p-8">
+          <Users className="h-12 w-12 text-gray-300 mb-4" />
+          <h3 className="text-lg font-medium text-gray-500">No recipients added</h3>
+          <p className="text-gray-400 text-center mt-1">
+            Add recipients to get started with notifications
+          </p>
+        </div>
+      );
+    }
     
-    if (automationEnabled) {
-      scheduleAutomatedNotifications(automationInterval, e.target.value);
-    }
+    return (
+      <Table>
+        <TableCaption>List of notification recipients</TableCaption>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>Role</TableHead>
+            <TableHead>Contact</TableHead>
+            <TableHead>Methods</TableHead>
+            <TableHead>Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {recipients.map((recipient) => (
+            <TableRow key={recipient.id}>
+              <TableCell>
+                <div className="flex items-center">
+                  <User className="h-4 w-4 mr-2 text-gray-500" />
+                  {recipient.name}
+                </div>
+              </TableCell>
+              <TableCell>
+                <span className={`px-2 py-1 rounded-full text-xs ${
+                  recipient.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+                }`}>
+                  {recipient.role}
+                </span>
+              </TableCell>
+              <TableCell>
+                <div className="text-sm">
+                  <div>{recipient.email}</div>
+                  {recipient.phone && <div className="text-gray-500">{recipient.phone}</div>}
+                </div>
+              </TableCell>
+              <TableCell>
+                <div className="flex space-x-2">
+                  {recipient.receiveEmail && (
+                    <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
+                      Email
+                    </span>
+                  )}
+                  {recipient.receiveWhatsapp && (
+                    <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
+                      WhatsApp
+                    </span>
+                  )}
+                </div>
+              </TableCell>
+              <TableCell>
+                <div className="flex space-x-2">
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={() => openEditDialog(recipient)}
+                  >
+                    <span className="sr-only">Edit</span>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-4 w-4"
+                    >
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                    onClick={() => handleDeleteRecipient(recipient.id)}
+                  >
+                    <span className="sr-only">Delete</span>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    );
   };
-  
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <BellRing className="h-6 w-6 text-primary" />
-        <h1 className="text-2xl font-bold">Notifications</h1>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Notifications</h1>
+          <p className="text-muted-foreground">
+            Configure and manage notifications for expiring medicines
+          </p>
+        </div>
+        <Button onClick={() => handleSaveSettings()}>
+          Save Settings
+        </Button>
       </div>
       
-      <Tabs defaultValue="send" className="w-full">
-        <TabsList className="grid grid-cols-3 mb-4">
-          <TabsTrigger value="send">Send Notifications</TabsTrigger>
-          <TabsTrigger value="automation">Automation</TabsTrigger>
-          {user?.role === 'admin' && (
-            <TabsTrigger value="recipients">Recipients</TabsTrigger>
-          )}
+      <Tabs defaultValue="settings" className="w-full">
+        <TabsList>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsTrigger value="history">Notification History</TabsTrigger>
+          <TabsTrigger value="recipients">Recipients</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="send">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="md:col-span-2">
-              <CardHeader>
-                <CardTitle>Send Notifications</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {isLoading ? (
-                  <div className="flex items-center justify-center h-32">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    <span className="ml-2">Loading medicine stats...</span>
-                  </div>
-                ) : (
-                  <>
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Card className="p-4 bg-orange-50 border-orange-200">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                              <AlertTriangle className="h-5 w-5 text-orange-500 mr-2" />
-                              <h3 className="text-sm font-medium">Expiring Soon</h3>
-                            </div>
-                            <span className="text-lg font-semibold">{medicineStats.expiringSoon}</span>
-                          </div>
-                        </Card>
-                        
-                        <Card className="p-4 bg-red-50 border-red-200">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                              <AlertTriangle className="h-5 w-5 text-red-500 mr-2" />
-                              <h3 className="text-sm font-medium">Expired</h3>
-                            </div>
-                            <span className="text-lg font-semibold">{medicineStats.expired}</span>
-                          </div>
-                        </Card>
-                      </div>
-                      
-                      {(medicineStats.expiringSoon > 0 || medicineStats.expired > 0) ? (
-                        <div className="space-y-2">
-                          <p className="text-sm">
-                            Send notifications about expiring and expired medicines to concerned staff members.
-                          </p>
-                          
-                          {whatsappNotifications && (
-                            <div className="space-y-2">
-                              <Label htmlFor="phoneNumber">WhatsApp Recipient Number</Label>
-                              <Input 
-                                id="phoneNumber" 
-                                value={phoneNumber} 
-                                onChange={(e) => setPhoneNumber(e.target.value)}
-                                placeholder="+1234567890"
-                              />
-                              <p className="text-xs text-gray-500">
-                                Enter the phone number with country code to receive WhatsApp notifications
-                              </p>
-                            </div>
-                          )}
-                          
-                          <Button 
-                            onClick={handleSendNotifications}
-                            disabled={isProcessing}
-                            className="w-full mt-2"
-                          >
-                            {isProcessing ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Sending notifications...
-                              </>
-                            ) : (
-                              <>
-                                <BellRing className="mr-2 h-4 w-4" />
-                                Send Notifications
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      ) : summaryLoaded ? (
-                        <div className="flex items-center justify-center py-8">
-                          <div className="text-center">
-                            <CheckCircle className="h-12 w-12 mx-auto text-green-500 mb-4" />
-                            <h3 className="text-lg font-medium">All good!</h3>
-                            <p className="text-gray-500 mt-1">
-                              No medicines are expiring soon or expired. No notifications needed.
-                            </p>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-center py-8">
-                          <AlertTriangle className="h-8 w-8 text-destructive" />
-                          <span className="ml-2">Failed to load medicine data</span>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader>
-                <CardTitle>Notification Settings</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Mail className="h-4 w-4 text-primary" />
-                      <Label htmlFor="email-notifications">Email Notifications</Label>
-                    </div>
-                    <Switch
-                      id="email-notifications"
-                      checked={emailNotifications}
-                      onCheckedChange={setEmailNotifications}
-                    />
-                  </div>
-                  
-                  <p className="text-xs text-gray-500 pl-6">
-                    Receive notifications via email
-                  </p>
-                </div>
-                
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <MessageSquare className="h-4 w-4 text-primary" />
-                      <Label htmlFor="whatsapp-notifications">WhatsApp Notifications</Label>
-                    </div>
-                    <Switch
-                      id="whatsapp-notifications"
-                      checked={whatsappNotifications}
-                      onCheckedChange={setWhatsappNotifications}
-                    />
-                  </div>
-                  
-                  <p className="text-xs text-gray-500 pl-6">
-                    Receive notifications via WhatsApp
-                  </p>
-                </div>
-                
-                <Button onClick={handleSaveSettings} className="w-full" variant="outline">
-                  <Settings className="mr-2 h-4 w-4" />
-                  Save Settings
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="automation">
+        <TabsContent value="settings" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Automated Notifications</CardTitle>
+              <CardTitle>Notification Methods</CardTitle>
+              <CardDescription>Choose how you want to be notified about expiring medicines</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label className="text-base">Enable Automated Notifications</Label>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      System will automatically send notifications based on your schedule
-                    </p>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <Label>Email Notifications</Label>
+                  <div className="text-sm text-muted-foreground">
+                    Receive emails about medicines that will expire soon
                   </div>
-                  <Switch
-                    checked={automationEnabled}
-                    onCheckedChange={handleAutomationToggle}
-                  />
                 </div>
-                
-                {automationEnabled && (
-                  <div className="space-y-4 pt-4">
-                    <div className="space-y-2">
-                      <Label>Schedule Frequency</Label>
-                      <div className="flex gap-2">
-                        <Button 
-                          variant={automationInterval === 'daily' ? 'default' : 'outline'}
-                          onClick={() => handleIntervalChange('daily')}
-                          className="flex-1"
-                        >
-                          Daily
-                        </Button>
-                        <Button 
-                          variant={automationInterval === 'weekly' ? 'default' : 'outline'}
-                          onClick={() => handleIntervalChange('weekly')}
-                          className="flex-1"
-                        >
-                          Weekly
-                        </Button>
-                        <Button 
-                          variant={automationInterval === 'monthly' ? 'default' : 'outline'}
-                          onClick={() => handleIntervalChange('monthly')}
-                          className="flex-1"
-                        >
-                          Monthly
-                        </Button>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="notification-time">Time of Day</Label>
-                      <Input
-                        id="notification-time"
-                        type="time"
-                        value={automationTime}
-                        onChange={handleTimeChange}
-                      />
-                    </div>
-                    
-                    <div className="bg-muted p-3 rounded-md">
-                      <p className="text-sm flex items-center">
-                        <CheckCircle className="h-4 w-4 mr-2 text-green-500" />
-                        Notifications will be sent {automationInterval} at {automationTime}
-                      </p>
-                    </div>
+                <Switch 
+                  checked={emailEnabled} 
+                  onCheckedChange={setEmailEnabled} 
+                />
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <Label>WhatsApp Notifications</Label>
+                  <div className="text-sm text-muted-foreground">
+                    Receive WhatsApp messages about medicines that will expire soon
                   </div>
-                )}
+                </div>
+                <Switch 
+                  checked={whatsappEnabled} 
+                  onCheckedChange={setWhatsappEnabled} 
+                />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle>Notification Timing</CardTitle>
+              <CardDescription>Configure when notifications should be sent</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="days-before">Days before expiry</Label>
+                <Input 
+                  id="days-before" 
+                  type="number" 
+                  value={daysBeforeExpiry}
+                  onChange={(e) => setDaysBeforeExpiry(Number(e.target.value))}
+                  min="1"
+                  max="90"
+                />
+                <p className="text-sm text-muted-foreground">
+                  You will be notified when medicines are within this many days of expiry
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="refresh-time">Daily check time</Label>
+                <Input 
+                  id="refresh-time" 
+                  type="time" 
+                  value={refreshTime}
+                  onChange={(e) => setRefreshTime(e.target.value)}
+                />
+                <p className="text-sm text-muted-foreground">
+                  The system will check for expiring medicines at this time each day
+                </p>
+              </div>
+              
+              <div className="pt-2">
+                <Button className="w-full" variant="outline">
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Run check now
+                </Button>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
         
-        {user?.role === 'admin' && (
-          <TabsContent value="recipients">
-            <Card>
-              <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+        <TabsContent value="history">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Notification History</CardTitle>
+                <CardDescription>Recent notifications sent about expiring medicines</CardDescription>
+              </div>
+              <AlertTriangle className="h-5 w-5 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              {renderNotificationHistory()}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="recipients">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
                 <CardTitle>Notification Recipients</CardTitle>
-                <Button size="sm" variant="outline" onClick={() => loadRecipients()}>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Refresh
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Email</TableHead>
-                          <TableHead>Phone</TableHead>
-                          <TableHead>Role</TableHead>
-                          <TableHead className="text-center">Email</TableHead>
-                          <TableHead className="text-center">WhatsApp</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {recipients.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={7} className="h-24 text-center">
-                              No recipients found. Add your first one below.
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          recipients.map((recipient) => (
-                            <TableRow key={recipient.id}>
-                              <TableCell>
-                                {editingRecipient?.id === recipient.id ? (
-                                  <Input
-                                    value={editingRecipient.name}
-                                    onChange={(e) => setEditingRecipient({...editingRecipient, name: e.target.value})}
-                                  />
-                                ) : (
-                                  recipient.name
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                {editingRecipient?.id === recipient.id ? (
-                                  <Input
-                                    value={editingRecipient.email}
-                                    onChange={(e) => setEditingRecipient({...editingRecipient, email: e.target.value})}
-                                  />
-                                ) : (
-                                  recipient.email
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                {editingRecipient?.id === recipient.id ? (
-                                  <Input
-                                    value={editingRecipient.phone || ''}
-                                    onChange={(e) => setEditingRecipient({...editingRecipient, phone: e.target.value})}
-                                  />
-                                ) : (
-                                  recipient.phone || '-'
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                {editingRecipient?.id === recipient.id ? (
-                                  <select
-                                    className="w-full p-2 border rounded"
-                                    value={editingRecipient.role}
-                                    onChange={(e) => setEditingRecipient({...editingRecipient, role: e.target.value})}
-                                  >
-                                    <option value="admin">Admin</option>
-                                    <option value="staff">Staff</option>
-                                  </select>
-                                ) : (
-                                  recipient.role
-                                )}
-                              </TableCell>
-                              <TableCell className="text-center">
-                                {editingRecipient?.id === recipient.id ? (
-                                  <Switch
-                                    checked={editingRecipient.receiveEmail}
-                                    onCheckedChange={(checked) => setEditingRecipient({...editingRecipient, receiveEmail: checked})}
-                                  />
-                                ) : (
-                                  recipient.receiveEmail ? 'Yes' : 'No'
-                                )}
-                              </TableCell>
-                              <TableCell className="text-center">
-                                {editingRecipient?.id === recipient.id ? (
-                                  <Switch
-                                    checked={editingRecipient.receiveWhatsapp}
-                                    onCheckedChange={(checked) => setEditingRecipient({...editingRecipient, receiveWhatsapp: checked})}
-                                  />
-                                ) : (
-                                  recipient.receiveWhatsapp ? 'Yes' : 'No'
-                                )}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                {editingRecipient?.id === recipient.id ? (
-                                  <Button 
-                                    size="sm" 
-                                    onClick={handleUpdateRecipient}
-                                    className="ml-2"
-                                  >
-                                    <Check className="h-4 w-4" />
-                                    Save
-                                  </Button>
-                                ) : (
-                                  <div className="flex justify-end gap-2">
-                                    <Button 
-                                      variant="outline" 
-                                      size="sm" 
-                                      onClick={() => handleStartEditing(recipient)}
-                                    >
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
-                                    <Button 
-                                      variant="outline" 
-                                      size="sm"
-                                      onClick={() => handleRemoveRecipient(recipient.id)}
-                                      className="text-red-500 hover:text-red-700"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
+                <CardDescription>
+                  Manage who receives notifications about expiring medicines
+                </CardDescription>
+              </div>
+              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm">Add Recipient</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add New Recipient</DialogTitle>
+                    <DialogDescription>
+                      Add a new person to receive medicine expiry notifications
+                    </DialogDescription>
+                  </DialogHeader>
+                  
+                  <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="name" className="text-right">Name</Label>
+                      <Input 
+                        id="name" 
+                        className="col-span-3" 
+                        value={newRecipient.name}
+                        onChange={(e) => setNewRecipient({...newRecipient, name: e.target.value})}
+                      />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="email" className="text-right">Email</Label>
+                      <Input 
+                        id="email" 
+                        type="email" 
+                        className="col-span-3" 
+                        value={newRecipient.email}
+                        onChange={(e) => setNewRecipient({...newRecipient, email: e.target.value})}
+                      />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="phone" className="text-right">Phone</Label>
+                      <Input 
+                        id="phone" 
+                        type="tel" 
+                        className="col-span-3" 
+                        placeholder="Optional"
+                        value={newRecipient.phone}
+                        onChange={(e) => setNewRecipient({...newRecipient, phone: e.target.value})}
+                      />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="role" className="text-right">Role</Label>
+                      <select
+                        id="role"
+                        className="col-span-3 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        value={newRecipient.role}
+                        onChange={(e) => setNewRecipient({...newRecipient, role: e.target.value})}
+                      >
+                        <option value="admin">Admin</option>
+                        <option value="staff">Staff</option>
+                      </select>
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="email-notif" className="text-right">Email Notifications</Label>
+                      <div className="col-span-3">
+                        <Switch 
+                          id="email-notif"
+                          checked={newRecipient.receiveEmail}
+                          onCheckedChange={(checked) => setNewRecipient({...newRecipient, receiveEmail: checked})}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="whatsapp-notif" className="text-right">WhatsApp Notifications</Label>
+                      <div className="col-span-3">
+                        <Switch 
+                          id="whatsapp-notif"
+                          checked={newRecipient.receiveWhatsapp}
+                          onCheckedChange={(checked) => setNewRecipient({...newRecipient, receiveWhatsapp: checked})}
+                        />
+                      </div>
+                    </div>
                   </div>
                   
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Add New Recipient</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid gap-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="recipient-name">Name</Label>
-                            <Input 
-                              id="recipient-name"
-                              value={newRecipient.name}
-                              onChange={(e) => setNewRecipient({...newRecipient, name: e.target.value})}
-                              placeholder="John Doe"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="recipient-email">Email</Label>
-                            <Input 
-                              id="recipient-email"
-                              type="email"
-                              value={newRecipient.email}
-                              onChange={(e) => setNewRecipient({...newRecipient, email: e.target.value})}
-                              placeholder="john@example.com"
-                            />
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="recipient-phone">Phone (for WhatsApp)</Label>
-                            <Input 
-                              id="recipient-phone"
-                              value={newRecipient.phone}
-                              onChange={(e) => setNewRecipient({...newRecipient, phone: e.target.value})}
-                              placeholder="+1234567890"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="recipient-role">Role</Label>
-                            <select
-                              id="recipient-role"
-                              className="w-full p-2 border rounded"
-                              value={newRecipient.role}
-                              onChange={(e) => setNewRecipient({...newRecipient, role: e.target.value})}
-                            >
-                              <option value="admin">Admin</option>
-                              <option value="staff">Staff</option>
-                            </select>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="flex items-center gap-2">
-                            <Switch
-                              id="receive-email"
-                              checked={newRecipient.receiveEmail}
-                              onCheckedChange={(checked) => setNewRecipient({...newRecipient, receiveEmail: checked})}
-                            />
-                            <Label htmlFor="receive-email">Receive Email Notifications</Label>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Switch
-                              id="receive-whatsapp"
-                              checked={newRecipient.receiveWhatsapp}
-                              onCheckedChange={(checked) => setNewRecipient({...newRecipient, receiveWhatsapp: checked})}
-                            />
-                            <Label htmlFor="receive-whatsapp">Receive WhatsApp Notifications</Label>
-                          </div>
-                        </div>
-                        <Button 
-                          onClick={handleAddRecipient} 
-                          disabled={isAddingRecipient || !newRecipient.name || !newRecipient.email}
-                          className="mt-2"
-                        >
-                          {isAddingRecipient ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Adding Recipient...
-                            </>
-                          ) : (
-                            <>
-                              <UserPlus className="mr-2 h-4 w-4" />
-                              Add Recipient
-                            </>
-                          )}
-                        </Button>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+                    <Button onClick={handleAddRecipient}>Add Recipient</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+              
+              <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Edit Recipient</DialogTitle>
+                    <DialogDescription>
+                      Update recipient's information
+                    </DialogDescription>
+                  </DialogHeader>
+                  
+                  {editingRecipient && (
+                    <div className="grid gap-4 py-4">
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="edit-name" className="text-right">Name</Label>
+                        <Input 
+                          id="edit-name" 
+                          className="col-span-3" 
+                          value={editingRecipient.name}
+                          onChange={(e) => setEditingRecipient({...editingRecipient, name: e.target.value})}
+                        />
                       </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        )}
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="edit-email" className="text-right">Email</Label>
+                        <Input 
+                          id="edit-email" 
+                          type="email" 
+                          className="col-span-3" 
+                          value={editingRecipient.email}
+                          onChange={(e) => setEditingRecipient({...editingRecipient, email: e.target.value})}
+                        />
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="edit-phone" className="text-right">Phone</Label>
+                        <Input 
+                          id="edit-phone" 
+                          type="tel" 
+                          className="col-span-3" 
+                          value={editingRecipient.phone || ""}
+                          onChange={(e) => setEditingRecipient({...editingRecipient, phone: e.target.value})}
+                        />
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="edit-role" className="text-right">Role</Label>
+                        <select
+                          id="edit-role"
+                          className="col-span-3 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                          value={editingRecipient.role}
+                          onChange={(e) => setEditingRecipient({...editingRecipient, role: e.target.value})}
+                        >
+                          <option value="admin">Admin</option>
+                          <option value="staff">Staff</option>
+                        </select>
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="edit-email-notif" className="text-right">Email Notifications</Label>
+                        <div className="col-span-3">
+                          <Switch 
+                            id="edit-email-notif"
+                            checked={editingRecipient.receiveEmail}
+                            onCheckedChange={(checked) => setEditingRecipient({...editingRecipient, receiveEmail: checked})}
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="edit-whatsapp-notif" className="text-right">WhatsApp Notifications</Label>
+                        <div className="col-span-3">
+                          <Switch 
+                            id="edit-whatsapp-notif"
+                            checked={editingRecipient.receiveWhatsapp}
+                            onCheckedChange={(checked) => setEditingRecipient({...editingRecipient, receiveWhatsapp: checked})}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => {
+                      setIsEditDialogOpen(false);
+                      setEditingRecipient(null);
+                    }}>Cancel</Button>
+                    <Button onClick={handleUpdateRecipient}>Update Recipient</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </CardHeader>
+            <CardContent>
+              {renderRecipientsList()}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
     </div>
   );
 };
 
-export default Notifications;
+export default NotificationsPage;
