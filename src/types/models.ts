@@ -37,6 +37,8 @@ export interface Notification {
   status: 'pending' | 'sent' | 'failed';
   createdAt: Date;
   sentAt?: Date;
+  // Adding message property that's used in the Notifications component
+  message: string;
 }
 
 export interface SummaryStats {
@@ -49,4 +51,15 @@ export interface SummaryStats {
 export interface ChartData {
   name: string;
   value: number;
+}
+
+// Adding Recipient interface that's referenced in Notifications component
+export interface Recipient {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  role: string;
+  receiveEmail: boolean;
+  receiveWhatsapp: boolean;
 }

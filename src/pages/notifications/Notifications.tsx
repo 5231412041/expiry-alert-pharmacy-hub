@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,7 +34,6 @@ const NotificationsPage = () => {
   const [editingRecipient, setEditingRecipient] = useState<Recipient | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   
-  // Fetch notifications and recipients on component mount
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -46,14 +44,12 @@ const NotificationsPage = () => {
         setNotifications(storedNotifications);
         setRecipients(storedRecipients);
         
-        // Also fetch notification settings
         const settingsStore = db.transaction('recipients', 'readonly')
           .objectStore('recipients');
         
-        // This is simplified, in a real app you might have a dedicated settings store
         const settingsCursor = await settingsStore.openCursor();
         if (settingsCursor) {
-          setEmailEnabled(true); // Default values
+          setEmailEnabled(true);
           setWhatsappEnabled(true);
           setDaysBeforeExpiry(30);
           setRefreshTime("08:00");
@@ -73,9 +69,6 @@ const NotificationsPage = () => {
 
   const handleSaveSettings = async () => {
     try {
-      // In a real app, save these settings to the database
-      // For now, we'll just show a success toast
-      
       toast({
         title: "Settings saved",
         description: "Your notification preferences have been updated",
@@ -94,22 +87,17 @@ const NotificationsPage = () => {
     try {
       const db = await getDB();
       
-      // Generate a unique ID
       const newId = `recipient-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
       
-      // Create the new recipient object with the generated ID
       const recipientToAdd = {
         ...newRecipient,
         id: newId,
       };
       
-      // Add to IndexedDB
       await db.add('recipients', recipientToAdd);
       
-      // Update local state
       setRecipients([...recipients, recipientToAdd]);
       
-      // Reset form and close dialog
       setNewRecipient({
         name: '',
         email: '',
@@ -140,7 +128,6 @@ const NotificationsPage = () => {
         const db = await getDB();
         await db.delete('recipients', id);
         
-        // Update local state
         setRecipients(recipients.filter(recipient => recipient.id !== id));
         
         toast({
@@ -170,12 +157,10 @@ const NotificationsPage = () => {
       const db = await getDB();
       await db.put('recipients', editingRecipient);
       
-      // Update local state
       setRecipients(recipients.map(r => 
         r.id === editingRecipient.id ? editingRecipient : r
       ));
       
-      // Close dialog and reset
       setIsEditDialogOpen(false);
       setEditingRecipient(null);
       
@@ -220,7 +205,7 @@ const NotificationsPage = () => {
         <TableBody>
           {notifications.map((notification) => (
             <TableRow key={notification.id}>
-              <TableCell>{new Date(notification.timestamp).toLocaleDateString()}</TableCell>
+              <TableCell>{new Date(notification.createdAt).toLocaleDateString()}</TableCell>
               <TableCell>
                 {notification.type === 'email' ? (
                   <Mail className="h-4 w-4 inline mr-1" />
