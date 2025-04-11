@@ -1,34 +1,57 @@
-
 import { v4 as uuidv4 } from 'uuid';
 import { getDB } from './db';
-import { Notification, Medicine, MedicineWithStatus, MedicineStatus } from '../types/models';
+import { Notification, Medicine, MedicineWithStatus, MedicineStatus, Recipient } from '../types/models';
 import { getMedicinesByStatus } from './medicineService';
-
-// Recipient interface
-interface Recipient {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  role: string;
-  receiveEmail: boolean;
-  receiveWhatsapp: boolean;
-}
 
 // Add notification
 export async function addNotification(medicineId: string, type: 'email' | 'whatsapp'): Promise<Notification> {
   const db = await getDB();
+  
+  // Fetch the medicine to generate the message content
+  const medicine = await db.get('medicines', medicineId);
+  
+  // Generate a default message based on medicine data and notification type
+  let defaultMessage = "Notification about medicine";
+  
+  if (medicine) {
+    const medicineWithStatus = {
+      ...medicine,
+      status: getMedicineStatus(medicine)
+    };
+    
+    // Use the appropriate content generation function based on type
+    if (type === 'email') {
+      defaultMessage = generateEmailContent(medicineWithStatus);
+    } else {
+      defaultMessage = generateWhatsAppContent(medicineWithStatus);
+    }
+  }
   
   const notification: Notification = {
     id: uuidv4(),
     medicineId,
     type,
     status: 'pending',
-    createdAt: new Date()
+    createdAt: new Date(),
+    message: defaultMessage // Add the message property that was missing
   };
   
   await db.put('notifications', notification);
   return notification;
+}
+
+// Helper function to determine medicine status
+function getMedicineStatus(medicine: Medicine): MedicineStatus {
+  const today = new Date();
+  const daysUntilExpiry = Math.ceil((medicine.expiryDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
+  
+  if (daysUntilExpiry <= 0) {
+    return MedicineStatus.EXPIRED;
+  } else if (daysUntilExpiry <= 30) {
+    return MedicineStatus.EXPIRING_SOON;
+  } else {
+    return MedicineStatus.SAFE;
+  }
 }
 
 // Get notifications by medicine ID
@@ -90,7 +113,6 @@ export function generateEmailContent(medicine: MedicineWithStatus): string {
 
 // Generate WhatsApp notification content
 export function generateWhatsAppContent(medicine: MedicineWithStatus): string {
-  // Similar to email but possibly shorter for WhatsApp
   const expiryDateFormatted = medicine.expiryDate.toLocaleDateString();
   
   if (medicine.status === MedicineStatus.EXPIRED) {
