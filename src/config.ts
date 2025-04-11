@@ -1,3 +1,4 @@
+
 // PostgreSQL Configuration
 // Update these values with your local PostgreSQL credentials
 export const dbConfig = {
@@ -10,7 +11,7 @@ export const dbConfig = {
 
 // API Configuration
 export const apiConfig = {
-  baseUrl: process.env.API_URL || 'http://localhost:5000/api',
+  baseUrl: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
   timeout: 10000, // 10 seconds
 };
 

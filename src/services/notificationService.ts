@@ -75,9 +75,9 @@ export async function processPendingNotifications(): Promise<void> {
   await notificationAPI.processPendingNotifications();
 }
 
-// Schedule automated notifications
-export async function scheduleAutomatedNotifications(interval: string, time: string): Promise<void> {
-  await notificationAPI.scheduleAutomatedNotifications(interval, time);
+// Schedule automated notifications - fix to match expected arguments
+export async function scheduleAutomatedNotifications(settings: { interval: string, time: string }): Promise<void> {
+  await notificationAPI.scheduleAutomatedNotifications(settings.interval, settings.time);
 }
 
 // Recipient management
