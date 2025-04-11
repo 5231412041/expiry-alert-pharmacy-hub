@@ -1,12 +1,11 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
-import { addMedicine } from '../../services/medicineService';
-import { MedicineWithStatus, Medicine } from '../../types/models';
+import { addMedicine, calculateMedicineStatus } from '../../services/medicineService';
+import { MedicineWithStatus, Medicine, MedicineStatus } from '../../types/models';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface AddMedicineDialogProps {
@@ -79,21 +78,6 @@ const AddMedicineDialog: React.FC<AddMedicineDialogProps> = ({
       setIsLoading(false);
     }
   };
-  
-  // Helper function to calculate medicine status
-  function calculateMedicineStatus(expiryDate: Date) {
-    const now = new Date();
-    const thirtyDaysFromNow = new Date();
-    thirtyDaysFromNow.setDate(now.getDate() + 30);
-    
-    if (expiryDate < now) {
-      return 'expired' as const;
-    } else if (expiryDate < thirtyDaysFromNow) {
-      return 'expiring-soon' as const;
-    } else {
-      return 'safe' as const;
-    }
-  }
   
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isLoading && !isOpen && onClose()}>

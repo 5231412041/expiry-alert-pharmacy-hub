@@ -3,6 +3,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { getDB } from './db';
 import { Medicine, MedicineStatus, MedicineWithStatus, SummaryStats } from '../types/models';
 
+// Re-export MedicineStatus enum to maintain backward compatibility
+export { MedicineStatus } from '../types/models';
+
 // Helper function to calculate medicine status
 export function calculateMedicineStatus(expiryDate: Date): MedicineStatus {
   const now = new Date();

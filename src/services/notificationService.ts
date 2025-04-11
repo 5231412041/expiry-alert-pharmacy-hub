@@ -1,8 +1,7 @@
-
 import { v4 as uuidv4 } from 'uuid';
 import { getDB } from './db';
-import { Notification, Medicine, MedicineWithStatus } from '../types/models';
-import { getMedicinesByStatus, MedicineStatus } from './medicineService';
+import { Notification, Medicine, MedicineWithStatus, MedicineStatus } from '../types/models';
+import { getMedicinesByStatus } from './medicineService';
 
 // Add notification
 export async function addNotification(medicineId: string, type: 'email' | 'whatsapp'): Promise<Notification> {
