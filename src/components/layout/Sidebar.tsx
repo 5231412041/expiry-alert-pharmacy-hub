@@ -4,13 +4,15 @@ import { Link, useLocation } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 import {
+  Home,
   LayoutDashboard,
   Pill,
   FileSpreadsheet,
   BellRing,
   AlertTriangle,
   LogOut,
-  CheckCircle
+  CheckCircle,
+  Package
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -68,6 +70,13 @@ const Sidebar = ({ isOpen }: SidebarProps) => {
         <nav className="flex-1 p-2">
           <div className="space-y-1">
             <SidebarItem 
+              icon={<Home size={20} />} 
+              label="Home" 
+              href="/" 
+              isActive={location.pathname === '/' || location.pathname === '/home'} 
+            />
+            
+            <SidebarItem 
               icon={<LayoutDashboard size={20} />} 
               label="Dashboard" 
               href="/dashboard" 
@@ -93,6 +102,13 @@ const Sidebar = ({ isOpen }: SidebarProps) => {
               label="Safe Medicines" 
               href="/safe-medicines" 
               isActive={location.pathname === '/safe-medicines'} 
+            />
+            
+            <SidebarItem 
+              icon={<Package size={20} />} 
+              label="Inventory" 
+              href="/inventory" 
+              isActive={location.pathname === '/inventory'} 
             />
             
             <SidebarItem 

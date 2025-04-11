@@ -1,47 +1,47 @@
 
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
+import { User, Medicine, Notification } from '../types/models';
 
-// Define the database schema
+// Recipient interface
+interface Recipient {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  role: string;
+  receiveEmail: boolean;
+  receiveWhatsapp: boolean;
+}
+
 interface PharmacyDB extends DBSchema {
   users: {
-    key: string; // email as key
-    value: {
-      id: string;
-      name: string;
-      email: string;
-      password: string; // In a real app, this would be hashed
-      role: 'admin' | 'staff';
-      createdAt: Date;
-    };
+    key: string;
+    value: User;
     indexes: { 'by-email': string };
   };
   medicines: {
-    key: string; // id
-    value: {
-      id: string;
-      name: string;
-      batch: string;
-      quantity: number;
-      manufacturer: string;
-      manufactureDate: Date;
-      expiryDate: Date;
-      addedBy: string; // email of user who added
-      addedAt: Date;
-    };
-    indexes: { 
-      'by-name': string;
-      'by-expiry': Date;
-    };
+    key: string;
+    value: Medicine;
+    indexes: { 'by-expiry': Date };
   };
   notifications: {
-    key: string; // id
+    key: string;
+    value: Notification;
+    indexes: { 'by-medicine': string };
+  };
+  recipients: {
+    key: string;
+    value: Recipient;
+    indexes: { 'by-role': string };
+  };
+  stockLogs: {
+    key: string;
     value: {
       id: string;
       medicineId: string;
-      type: 'email' | 'whatsapp';
-      status: 'pending' | 'sent' | 'failed';
-      createdAt: Date;
-      sentAt?: Date;
+      adjustmentAmount: number;
+      userId: string;
+      timestamp: Date;
     };
     indexes: { 'by-medicine': string };
   };
@@ -49,32 +49,45 @@ interface PharmacyDB extends DBSchema {
 
 let db: IDBPDatabase<PharmacyDB>;
 
-export async function initDB(): Promise<IDBPDatabase<PharmacyDB>> {
-  if (db) return db;
-  
-  db = await openDB<PharmacyDB>('pharmacy-expiry-tracker', 1, {
+export async function initDB(): Promise<void> {
+  db = await openDB<PharmacyDB>('pharmacy-db', 1, {
     upgrade(db) {
-      // Create users store
-      const userStore = db.createObjectStore('users', { keyPath: 'email' });
-      userStore.createIndex('by-email', 'email');
-
-      // Create medicines store
-      const medicineStore = db.createObjectStore('medicines', { keyPath: 'id' });
-      medicineStore.createIndex('by-name', 'name');
-      medicineStore.createIndex('by-expiry', 'expiryDate');
+      // Users store
+      if (!db.objectStoreNames.contains('users')) {
+        const userStore = db.createObjectStore('users', { keyPath: 'id' });
+        userStore.createIndex('by-email', 'email', { unique: true });
+      }
       
-      // Create notifications store
-      const notificationStore = db.createObjectStore('notifications', { keyPath: 'id' });
-      notificationStore.createIndex('by-medicine', 'medicineId');
+      // Medicines store
+      if (!db.objectStoreNames.contains('medicines')) {
+        const medicineStore = db.createObjectStore('medicines', { keyPath: 'id' });
+        medicineStore.createIndex('by-expiry', 'expiryDate');
+      }
+      
+      // Notifications store
+      if (!db.objectStoreNames.contains('notifications')) {
+        const notificationStore = db.createObjectStore('notifications', { keyPath: 'id' });
+        notificationStore.createIndex('by-medicine', 'medicineId');
+      }
+      
+      // Recipients store
+      if (!db.objectStoreNames.contains('recipients')) {
+        const recipientStore = db.createObjectStore('recipients', { keyPath: 'id' });
+        recipientStore.createIndex('by-role', 'role');
+      }
+      
+      // Stock Logs store
+      if (!db.objectStoreNames.contains('stockLogs')) {
+        const stockLogStore = db.createObjectStore('stockLogs', { keyPath: 'id' });
+        stockLogStore.createIndex('by-medicine', 'medicineId');
+      }
     }
   });
-
-  return db;
 }
 
 export async function getDB(): Promise<IDBPDatabase<PharmacyDB>> {
   if (!db) {
-    return initDB();
+    await initDB();
   }
   return db;
 }

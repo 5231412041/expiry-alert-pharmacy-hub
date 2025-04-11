@@ -13,6 +13,9 @@ import AppLayout from "./components/layout/AppLayout";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 
+// Home
+import Home from "./pages/home/Home";
+
 // Dashboard
 import Dashboard from "./pages/dashboard/Dashboard";
 
@@ -22,6 +25,9 @@ import ExpiringSoon from "./pages/medicines/ExpiringSoon";
 import SafeMedicines from "./pages/medicines/SafeMedicines";
 import CSVUpload from "./pages/medicines/CSVUpload";
 import Notifications from "./pages/notifications/Notifications";
+
+// Inventory Pages
+import Inventory from "./pages/inventory/Inventory";
 
 // Other Pages
 import NotFound from "./pages/NotFound";
@@ -59,13 +65,15 @@ const App = () => {
               
               {/* Protected Routes */}
               <Route path="/" element={<AppLayout />}>
-                <Route index element={<Navigate to="/dashboard" replace />} />
+                <Route index element={<Home />} />
+                <Route path="home" element={<Home />} />
                 <Route path="dashboard" element={<Dashboard />} />
                 <Route path="medicines" element={<Medicines />} />
                 <Route path="expiring-soon" element={<ExpiringSoon />} />
                 <Route path="safe-medicines" element={<SafeMedicines />} />
                 <Route path="csv-upload" element={<CSVUpload />} />
                 <Route path="notifications" element={<Notifications />} />
+                <Route path="inventory" element={<Inventory />} />
               </Route>
               
               {/* Catch-all route */}

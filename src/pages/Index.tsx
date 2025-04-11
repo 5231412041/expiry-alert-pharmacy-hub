@@ -11,7 +11,7 @@ const Index = () => {
   useEffect(() => {
     if (!isLoading) {
       if (user) {
-        navigate('/dashboard');
+        navigate('/home'); // Updated to redirect to home page instead of dashboard
       } else {
         navigate('/login');
       }
